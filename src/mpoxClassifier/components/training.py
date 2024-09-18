@@ -17,8 +17,8 @@ class Training:
         # Get the output of the previous layer (after flatten)
         x = base_model.layers[-1].output
 
-        # Add a new Dense layer with 6 units for the 6 classes
-        output_layer = tf.keras.layers.Dense(6, activation='softmax')(x)
+        # Add a new Dense layer with 6 units for the 6 classes, and assign a unique name
+        output_layer = tf.keras.layers.Dense(6, activation='softmax', name='new_output_layer')(x)
         
         # Create a new model that includes the base model and the new output layer
         self.model = tf.keras.Model(inputs=base_model.input, outputs=output_layer)
@@ -29,6 +29,7 @@ class Training:
             loss='categorical_crossentropy',  # Assuming one-hot encoded labels
             metrics=['accuracy']
         )
+
 
 
         

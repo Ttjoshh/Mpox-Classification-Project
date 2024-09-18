@@ -1,0 +1,117 @@
+schema: '2.0'
+stages:
+  data_ingestion:
+    cmd: python src/mpoxClassifier/pipeline/stage_01_data_ingestion.py
+    deps:
+    - path: config/config.yaml
+      hash: md5
+      md5: a8b3e5542deacc20c8e0601d68ff858e
+      size: 793
+    - path: src/mpoxClassifier/pipeline/stage_01_data_ingestion.py
+      hash: md5
+      md5: 7e33894e8d2eb8b72906bbcc0e7a6a70
+      size: 917
+    outs:
+    - path: artifacts/data_ingestion/images
+      hash: md5
+      md5: 30686af45666b1cee94652e44edf28d6.dir
+      size: 446662029
+      nfiles: 29512
+  prepare_base_model:
+    cmd: python src/mpoxClassifier/pipeline/stage_02_prepare_base_model.py
+    deps:
+    - path: config/config.yaml
+      hash: md5
+      md5: a8b3e5542deacc20c8e0601d68ff858e
+      size: 793
+    - path: src/mpoxClassifier/pipeline/stage_02_prepare_base_model.py
+      hash: md5
+      md5: 7b109a0118d9b160511b961467a0a647
+      size: 1013
+    params:
+      params.yaml:
+        CLASSES: 2
+        IMAGE_SIZE:
+        - 224
+        - 224
+        - 3
+        INCLUDE_TOP: false
+        LEARNING_RATE: 0.01
+        WEIGHTS: imagenet
+    outs:
+    - path: artifacts/prepare_base_model
+      hash: md5
+      md5: 0e9cd657fda5022d816da254c2ecbc1f.dir
+      size: 118073464
+      nfiles: 2
+  training:
+    cmd: python src/mpoxClassifier/pipeline/stage_03_training.py
+    deps:
+    - path: artifacts/data_ingestion/images
+      hash: md5
+      md5: 30686af45666b1cee94652e44edf28d6.dir
+      size: 446662029
+      nfiles: 29512
+    - path: artifacts/prepare_base_model
+      hash: md5
+      md5: 0e9cd657fda5022d816da254c2ecbc1f.dir
+      size: 118073464
+      nfiles: 2
+    - path: config/config.yaml
+      hash: md5
+      md5: a8b3e5542deacc20c8e0601d68ff858e
+      size: 793
+    - path: src/mpoxClassifier/components/prepare_callbacks.py
+      hash: md5
+      md5: d25577545c8fcc87f88145f5657c9ae5
+      size: 1013
+    - path: src/mpoxClassifier/pipeline/stage_03_training.py
+      hash: md5
+      md5: 44a6f5ebd8da7f0836ee2e2888308a9e
+      size: 1302
+    params:
+      params.yaml:
+        AUGMENTATION: true
+        BATCH_SIZE: 16
+        EPOCHS: 2
+        IMAGE_SIZE:
+        - 224
+        - 224
+        - 3
+    outs:
+    - path: artifacts/training/model.h5
+      hash: md5
+      md5: e5cdf49e95deb9a870659add391bc496
+      size: 59556952
+  evaluation:
+    cmd: python src/mpoxClassifier/pipeline/stage_04_evaluation.py
+    deps:
+    - path: artifacts/data_ingestion/images
+      hash: md5
+      md5: 30686af45666b1cee94652e44edf28d6.dir
+      size: 446662029
+      nfiles: 29512
+    - path: artifacts/training/model.h5
+      hash: md5
+      md5: e5cdf49e95deb9a870659add391bc496
+      size: 59556952
+    - path: config/config.yaml
+      hash: md5
+      md5: a8b3e5542deacc20c8e0601d68ff858e
+      size: 793
+    - path: src/mpoxClassifier/pipeline/stage_04_evaluation.py
+      hash: md5
+      md5: 334897d3b958ce2831693d7f65c6922f
+      size: 897
+    params:
+      params.yaml:
+        BATCH_SIZE: 16
+        IMAGE_SIZE:
+        - 224
+        - 224
+        - 3
+    outs:
+    - path: scores.json
+      hash: md5
+      md5: fac782ee6c61d177d8b4c5d170b0f592
+      size: 74
