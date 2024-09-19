@@ -78,6 +78,7 @@ class ConfigurationManager:
             Path(training.root_dir)
         ])
         
+        
         training_config = TrainingConfig(
             root_dir=Path(training.root_dir),
             trained_model_path=Path(training.trained_model_path),
@@ -87,7 +88,8 @@ class ConfigurationManager:
             params_batch_size=params.BATCH_SIZE,
             params_is_augmentation=params.AUGMENTATION,
             params_image_size=params.IMAGE_SIZE,
-            params_learning_rate=params.LEARNING_RATE 
+            params_learning_rate=params.LEARNING_RATE,
+            
         )
         
         return training_config

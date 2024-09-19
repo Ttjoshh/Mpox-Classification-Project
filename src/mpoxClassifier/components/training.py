@@ -9,40 +9,10 @@ class Training:
         self.logger = logging.getLogger("mpoxClassifierLogger")
         
     def get_base_model(self):
-        try:
-            # Load EfficientNetB5 as the base model with pre-trained ImageNet weights
-            self.logger.info("Loading EfficientNetB5 with ImageNet weights.")
-            base_model = tf.keras.applications.EfficientNetB5(
-                input_shape=self.config.params_image_size,
-                include_top=self.config.params_include_top,
-                weights=self.config.params_weights
-            )
-            
-            # Freeze the layers in the base model to preserve pre-trained weights
-            for layer in base_model.layers:
-                layer.trainable = False
-
-            # Get the output of the base model
-            x = base_model.output
-            
-            # Add a new output layer for 6 classes with softmax activation
-            x = tf.keras.layers.GlobalAveragePooling2D()(x)
-            output_layer = tf.keras.layers.Dense(self.config.params_classes, activation='softmax', name='new_output_layer')(x)
-            
-            # Create a new model that includes the base model and the new output layer
-            self.model = tf.keras.Model(inputs=base_model.input, outputs=output_layer)
-            
-            # Compile the model with appropriate loss and optimizer
-            self.model.compile(
-                optimizer=tf.keras.optimizers.Adam(learning_rate=self.config.params_learning_rate),
-                loss='categorical_crossentropy',  # Assuming one-hot encoded labels
-                metrics=['accuracy']
-            )
-            self.logger.info("EfficientNetB5 model compiled successfully.")
-        except Exception as e:
-            self.logger.error("Error in get_base_model: %s", e)
-            raise
-    
+        self.model = tf.keras.models.load_model(
+            self.config.updated_base_model_path
+        )
+          
     def train_valid_generator(self):
         try:
             datagenerator_kwargs = dict(
