@@ -2,7 +2,7 @@ AUGMENTATION: True
 IMAGE_SIZE: [456, 456, 3] # Recommended input size for EfficientNetB5
 BATCH_SIZE: 16
 INCLUDE_TOP: False
-EPOCHS: 3
+EPOCHS: 1
 CLASSES: 6
 WEIGHTS: imagenet
 LEARNING_RATE: 0.001

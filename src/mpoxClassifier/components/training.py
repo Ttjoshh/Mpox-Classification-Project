@@ -1,7 +1,10 @@
+from sklearn.utils.class_weight import compute_class_weight
+import numpy as np
 import tensorflow as tf
 from pathlib import Path
 from mpoxClassifier.entity.config_entity import TrainingConfig
 import logging
+
 
 class Training:
     def __init__(self, config: TrainingConfig):
@@ -9,9 +12,7 @@ class Training:
         self.logger = logging.getLogger("mpoxClassifierLogger")
         
     def get_base_model(self):
-        self.model = tf.keras.models.load_model(
-            self.config.updated_base_model_path
-        )
+        self.model = tf.keras.models.load_model(self.config.updated_base_model_path)
           
     def train_valid_generator(self):
         try:
@@ -30,7 +31,6 @@ class Training:
                 **datagenerator_kwargs
             )
             
-            # Create validation generator
             self.valid_generator = valid_datagenerator.flow_from_directory(
                 directory=self.config.training_data,
                 subset="validation",
@@ -38,7 +38,6 @@ class Training:
                 **dataflow_kwargs
             )
             
-            # Check if we have enough samples
             if self.valid_generator.samples == 0:
                 raise ValueError("No validation samples found. Check your validation split or directory path.")
             
@@ -55,21 +54,36 @@ class Training:
             else:
                 train_datagenerator = valid_datagenerator
             
-            # Create training generator
             self.train_generator = train_datagenerator.flow_from_directory(
                 directory=self.config.training_data,
                 subset="training",
                 shuffle=True,
                 **dataflow_kwargs
             )
-
-            # Check if we have enough samples
+            
             if self.train_generator.samples == 0:
                 raise ValueError("No training samples found. Check your training split or directory path.")
             
             self.logger.info("Data generators created successfully.")
         except Exception as e:
             self.logger.error("Error in train_valid_generator: %s", e)
+            raise
+    
+    def calculate_class_weights(self):
+        try:
+            # Get the total number of samples per class from the training generator
+            labels = self.train_generator.classes  # List of class indices for each image
+            class_weights = compute_class_weight(
+                class_weight='balanced',
+                classes=np.unique(labels),
+                y=labels
+            )
+            class_weight_dict = dict(enumerate(class_weights))  # Map class index to weight
+            
+            self.logger.info("Class weights calculated successfully: %s", class_weight_dict)
+            return class_weight_dict
+        except Exception as e:
+            self.logger.error("Error in calculating class weights: %s", e)
             raise
     
     @staticmethod
@@ -84,7 +98,6 @@ class Training:
     
     def train(self, callback_list: list):
         try:
-            # Ensure we have enough samples
             if self.train_generator.samples < self.config.params_batch_size:
                 raise ValueError("Not enough training samples. Consider increasing your dataset size or adjusting batch size.")
             if self.valid_generator.samples < self.config.params_batch_size:
@@ -98,15 +111,19 @@ class Training:
                 tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
                 tf.keras.callbacks.ModelCheckpoint(filepath='best_model.keras', save_best_only=True, monitor='val_loss')
             ] + callback_list
+
+            # Calculate class weights
+            class_weight_dict = self.calculate_class_weights()
             
-            # Train the model
+            # Train the model with class weights
             history = self.model.fit(
                 self.train_generator,
                 epochs=self.config.params_epochs,
                 steps_per_epoch=self.steps_per_epoch,
                 validation_steps=self.validation_steps,
                 validation_data=self.valid_generator,
-                callbacks=callbacks
+                callbacks=callbacks,
+                class_weight=class_weight_dict  # Pass the calculated class weights
             )
             
             # Save the model
@@ -115,7 +132,6 @@ class Training:
                 model=self.model
             )
             
-            # Optionally, save training history
             self.logger.info("Model training completed.")
             return history
         except Exception as e:
