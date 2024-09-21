@@ -6,6 +6,7 @@ from mpoxClassifier.entity.config_entity import TrainingConfig
 import logging
 
 
+
 class Training:
     def __init__(self, config: TrainingConfig):
         self.config = config
@@ -49,6 +50,8 @@ class Training:
                     height_shift_range=0.2,
                     shear_range=0.2,
                     zoom_range=0.2,
+                    brightness_range=[0.8, 1.2],  # Randomly change brightness
+                    fill_mode='nearest',
                     **datagenerator_kwargs
                 )
             else:
@@ -64,6 +67,8 @@ class Training:
             if self.train_generator.samples == 0:
                 raise ValueError("No training samples found. Check your training split or directory path.")
             
+            self.logger.info(f"Training samples: {self.train_generator.samples}, Validation samples: {self.valid_generator.samples}")
+
             self.logger.info("Data generators created successfully.")
         except Exception as e:
             self.logger.error("Error in train_valid_generator: %s", e)
@@ -72,7 +77,10 @@ class Training:
     def calculate_class_weights(self):
         try:
             # Get the total number of samples per class from the training generator
-            labels = self.train_generator.classes  # List of class indices for each image
+            labels = self.train_generator.classes 
+            if len(labels) == 0:
+                raise ValueError("No labels found in the training generator.")# List of class indices for each image
+            
             class_weights = compute_class_weight(
                 class_weight='balanced',
                 classes=np.unique(labels),
@@ -103,18 +111,42 @@ class Training:
             if self.valid_generator.samples < self.config.params_batch_size:
                 raise ValueError("Not enough validation samples. Consider increasing your dataset size or adjusting batch size.")
             
-            self.steps_per_epoch = self.train_generator.samples // self.train_generator.batch_size
+            self.steps_per_epoch = max(1, self.train_generator.samples // self.train_generator.batch_size)
             self.validation_steps = self.valid_generator.samples // self.valid_generator.batch_size
             
-            # Add EarlyStopping and ModelCheckpoint callbacks
-            callbacks = [
-                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
+            
+            optimizer = tf.keras.optimizers.Adam(learning_rate=self.config.params_learning_rate, clipnorm=1.0)
+            self.model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+
+
+             # Initialize callbacks
+            callbacks = []  # Initialize the callbacks list here
+            
+            callbacks.append(
+                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
+            )
+            callbacks.append(
                 tf.keras.callbacks.ModelCheckpoint(filepath='best_model.keras', save_best_only=True, monitor='val_loss')
-            ] + callback_list
+            )
+            callbacks.append(
+                tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=2, min_lr=1e-6)
+            )
+            callbacks.append(
+                tf.keras.callbacks.TensorBoard(log_dir='logs', histogram_freq=1)
+            )
+
+            # Add any user-defined callbacks
+            callbacks.extend(callback_list)
+            
+           
 
             # Calculate class weights
             class_weight_dict = self.calculate_class_weights()
             
+            callbacks.append(
+                tf.keras.callbacks.TensorBoard(log_dir='logs', histogram_freq=1)
+            )
+
             # Train the model with class weights
             history = self.model.fit(
                 self.train_generator,
